@@ -9,17 +9,11 @@ These samples demonstrate how to verify a speaker with audio sample files using 
 * A subscription key for the Speech service. See [Try the speech service for free](https://docs.microsoft.com/azure/cognitive-services/speech-service/get-started).
 
 
-## Build the sample
-
-* Make a copy of the `token-sample.php` file and rename it `token.php`. 
-* In this file, input your $subscriptionKey and $region variables from the Azure Speech dashboard (see prerequisites).
-* You need to start a local PHP server. On a mac, if you have PHP installed (`brew install php`), then you can run `php -S localhost:9000`
-
 ## Run the `dependent-verification.html` sample
 
-* browse to `http://localhost:9000/dependent-verification.html`
+* Open the `index.html` file or `dependent-verification.html` file in your web browser. The `index.html` file allows you to record your voice in the browser, while the `dependent-verification.html` file relies on you having a pre-recorded verification file.
 * Use the input fields to set your `subscription key` and `service region`.
-* Upload your enrollment files (samples), and your verification file (voice to compare to samples for a match)
+* Upload your enrollment files (samples), and your verification file (voice to compare to samples for a match). If you are using `index.html` - you will first need to record and download this file, then use that download as the verification file (to avoid a security issue with javascript audio recording) 
 * Press the `Create Profile` button to create a voice profile and enroll using the chosen enrollment files.
 * Press the `Verify Speaker` button to identify a speaker using the chosen verification file.
 

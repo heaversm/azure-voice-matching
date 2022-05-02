@@ -3,6 +3,27 @@
 <head>
   <title>Voice Matching Authentication Prototype</title>
   <meta charset="utf-8" />
+  <style>
+
+    .hidden {
+      display: none;
+    }
+    .italic {
+      font-style: italic;
+    }
+    #matchScore.match {
+      background-color: #8DDD84;
+    }
+
+    #matchScore.nomatch {
+      background-color: #D03485;
+      color: white;
+    }
+    #matchScore {
+      background-color: #F4CA55;
+      color: #1D1238;
+    }
+</style>
 </head>
 <body style="font-family:'Helvetica Neue',Helvetica,Arial,sans-serif; font-size:13px;">
   <div id="warning">
@@ -11,33 +32,67 @@
   
   <div id="content" style="display:none">
     <table width="100%">
+      
       <tr>
         <td></td>
         <td><h1 style="font-weight:500;"> 	
           Voice Matching Authentication Prototype</h1></td>
       </tr>
+
       <tr>
-        <td align="right"><a href="https://docs.microsoft.com/azure/cognitive-services/speech-service/get-started" target="_blank">Subscription</a>:</td>
+        <td align="right"><a href="https://docs.microsoft.com/azure/cognitive-services/speech-service/get-started" target="_blank">Add Azure Key 1 or 2</a>:</td>
         <td><input id="subscriptionKey" type="text" size="40" value=""></td>
       </tr>
       <tr>
-        <td align="right">Region</td>
+        <td align="right">Add Azure Region</td>
         <td><input id="serviceRegion" type="text" size="40" value="westus"></td>
       </tr>
       <tr>
-        <td align="right">Enrollment Files</td>
+        <td align="right">Upload Sample Files</td>
         <td>
           <input type="file" multiple id="filePicker" accept=".wav" />
         </td>
       </tr>
       <tr>
-        <td align="right">Test Identification File</td>
+        <td align="right">Phrase to Repeat</td>
         <td>
-          <input type="file" id="testFilePicker" accept=".wav" />
+          <div class="audio-sample-container">
+            <audio src="audioSample.wav" id="audioSample" controls></audio>
+          </div>
         </td>
       </tr>
       <tr>
-        <td></td>
+        <td align="right" valign="top">Record Audio</td>
+        <td>
+          <div class="audio-record-controls">
+            <button id="btnStart">Start Recording</button><br/><br/>
+            <button id="btnStop" class="hidden">Stop Recording</button>
+          </div>
+          
+        </td>
+      </tr>
+      <tr>
+        <td align="right">Hear Your Recording</td>
+        <td>
+          <div class="audio-record-playback">
+            <audio id="audioRecord" controls></audio>
+          </div>
+        </td>
+      </tr>
+      <tr>
+        <td align="right">Download Recording</td>
+        <td>
+          <a href="#" id="btnDownload">Download</a>
+        </td>
+      </tr>
+      <tr>
+        <td align="right">Test Identification File</td>
+        <td>
+          <input type="file" id="testFilePicker"/>
+        </td>
+      </tr>
+      <tr>
+        <td align="right">Create Voice Profile</td>
         <td><button id="createVoiceProfileButton">Create Voice Profile</button></td>
       </tr>
       <tr>
@@ -46,15 +101,17 @@
       </tr>
       <tr>
         <td></td>
-        <td><button id="listPhrasesButton">List Activation Phrases</button></td>
-      </tr>
-      <tr>
-        <td></td>
         <td><button id="deleteProfileButton">Delete Voice Profile</button></td>
       </tr>
       <tr>
-        <td align="right" valign="top">Result</td>
+        <td align="right" valign="top">Status</td>
         <td><textarea id="resultDiv" style="display: inline-block;width:500px;height:200px"></textarea></td>
+      </tr>
+      <tr>
+        <td align="right" valign="top">Match Score</td>
+        <td>
+          <div id="matchScore"></div>
+        </td>
       </tr>
     </table>
   </div>
@@ -69,7 +126,7 @@
     var createVoiceProfileButton;
     var verifySpeakerButton;
     var deleteProfileButton;
-    var listPhrasesButton;
+    var matchScore;
 
 
     // subscription key and region for speech services.
@@ -80,27 +137,126 @@
     var speechConfig, profile;
     var locale = "en-us";
 
+    var matchThresholdLower = 0.6;
+    var matchThresholdUpper = 0.75
+
     document.addEventListener("DOMContentLoaded", function () {
 
+      
       createVoiceProfileButton = document.getElementById("createVoiceProfileButton");
       verifySpeakerButton = document.getElementById("verifySpeakerButton");
-      listPhrasesButton = document.getElementById("listPhrasesButton");
+
       deleteProfileButton = document.getElementById("deleteProfileButton");
       subscriptionKey = document.getElementById("subscriptionKey");
       serviceRegion = document.getElementById("serviceRegion");
       resultDiv = document.getElementById("resultDiv");
+      matchScore = document.getElementById("matchScore");
       filePicker = document.getElementById("filePicker");
       testFilePicker = document.getElementById("testFilePicker");
       
       deleteProfileButton.disabled = true;
-      listPhrasesButton.disabled = true;
       verifySpeakerButton.disabled = true;
+
+      let errorResponse;
+
+      //RECORDING
+
+      let audioIN = { audio: true };
+      //  audio is true, for recording
+
+      // Access the permission for use
+      // the microphone
+      navigator.mediaDevices.getUserMedia(audioIN)
+
+        // 'then()' method returns a Promise
+        .then(function (mediaStreamObj) {
+
+          // Start record
+          let start = document.getElementById('btnStart');
+
+          // Stop record
+          let stop = document.getElementById('btnStop');
+
+          let btnDownload = document.getElementById('btnDownload');
+
+          let recordAudio = document.getElementById('audioRecord');
+
+          // This is the main thing to recorded
+          // the audio 'MediaRecorder' API
+          let mediaRecorder = new MediaRecorder(mediaStreamObj);
+          // Pass the audio stream
+
+          // Start event
+          start.addEventListener('click', function (ev) {
+            
+            toggleStartRecording(true);
+            // console.log(mediaRecorder.state);
+          })
+
+          // Stop event
+          stop.addEventListener('click', function (ev) {
+              toggleStartRecording(false);
+            // console.log(mediaRecorder.state);
+          });
+
+
+          toggleStartRecording =(doStart = true) => {
+              console.log(start,stop,doStart);
+              start.classList.toggle('hidden',doStart);
+              stop.classList.toggle('hidden',!doStart);
+              doStart ? mediaRecorder.start() : mediaRecorder.stop();
+          }
+
+          // Chunk array to store the audio data
+          let dataArray = [];
+
+                  // If audio data available then push
+          // it to the chunk array
+          mediaRecorder.ondataavailable = function (ev) {
+            dataArray.push(ev.data);
+          }
+
+          // Convert the audio data in to blob
+          // after stopping the recording
+          mediaRecorder.onstop = function (ev) {
+
+            // blob of type mp3
+            let audioData = new Blob(dataArray,
+                      { 'type': 'audio/wav;' }); //MH - was audio/mp3
+            
+            // After fill up the chunk
+            // array make it empty
+            dataArray = [];
+
+            // Creating audio url with reference
+            // of created blob named 'audioData'
+            let audioSrc = window.URL
+                .createObjectURL(audioData);
+
+            // Pass the audio url to the 2nd video tag
+            recordAudio.src = audioSrc;
+            console.log("audioSrc",audioSrc);
+            console.log("audioData",audioData);
+            console.log("btnDownload",btnDownload);
+            btnDownload.href = audioSrc;
+            btnDownload.download = 'testFile.wav';
+          }
+
+        })
+
+        // If any error occurs then handles the error
+        .catch(function (err) {
+          console.log(err.name, err.message);
+        });
+      //END RECORDING
+
       filePicker.addEventListener("change", function () {
           audioFiles = filePicker.files;
       });
 
       testFilePicker.addEventListener("change", function () {
           testFile = testFilePicker.files[0];
+          console.log("testFile",testFile);
       });
 
       createVoiceProfileButton.addEventListener("click", async function () {
@@ -116,7 +272,6 @@
         speechConfig = SpeechSDK.SpeechConfig.fromSubscription(subscriptionKey.value, serviceRegion.value);
 
         client = new SpeechSDK.VoiceProfileClient(speechConfig);
-        listPhrasesButton.disabled = false;
 
         try {
           profile = await client.createProfileAsync(SpeechSDK.VoiceProfileType.TextDependentVerification, locale);
@@ -151,7 +306,9 @@
       });
 
       verifySpeakerButton.addEventListener("click", async function () {
+        console.log("testfile", testFile);
         let testAudioConfig = SpeechSDK.AudioConfig.fromWavFileInput(testFile);
+        console.log("testaudioconfig", testAudioConfig);
         let recognizer = new SpeechSDK.SpeakerRecognizer(speechConfig, testAudioConfig);
         let model = SpeechSDK.SpeakerVerificationModel.fromProfile(profile);
         try {
@@ -171,27 +328,21 @@
             resultDiv.innerHTML += "\n"; 
             resultDiv.innerHTML += "(Verification result) Score: " + result.score; 
             resultDiv.innerHTML += "\r\n"; 
+
+            matchScore.innerHTML = result.score;
+            if (result.score > matchThresholdUpper){
+              matchScore.className = 'match';
+            } else if (result.score < matchThresholdLower){
+              matchScore.className = 'nomatch';
+            } else {
+              matchScore.className = '';
+            }
+            
+
           }
         } catch (err) {
           window.console.log(err);
           resultDiv.innerHTML += "ERROR: " + err; 
-        }
-      });
-      
-      listPhrasesButton.addEventListener("click", async function () {
-        if (client) {
-          try {
-            let result = await client.getActivationPhrasesAsync(SpeechSDK.VoiceProfileType.TextDependentVerification, locale);
-            if (result.phrases.length > 0) {
-              for (const phrase of result.phrases) {
-                resultDiv.innerHTML += "(Activation Phrases) Received: " + phrase;
-                resultDiv.innerHTML += "\r\n";
-              }
-            }
-          } catch (err) {
-            window.console.log(err);
-            resultDiv.innerHTML += "ERROR: " + err; 
-          }
         }
       });
 
